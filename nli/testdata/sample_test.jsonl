@@ -1,0 +1,12 @@
+{"gold_label": "neutral", "sentence1": "That's a bottomless pit.", "sentence2": "Don't get bent out of shape over it."}
+{"gold_label": "contradiction", "sentence1": "I can't wrap my mind around that.", "sentence2": "Branding."}
+{"gold_label": "entailment", "sentence1": "It's the elephant in the room.", "sentence2": "Sorry, that's not really in my wheelhouse."}
+{"gold_label": "contradiction", "sentence1": "Let it go.", "sentence2": "She's batshit crazy"}
+{"gold_label": "contradiction", "sentence1": "The universe will provide.", "sentence2": "I know exactly."}
+{"gold_label": "contradiction", "sentence1": "What doesn't kill you makes you stronger.", "sentence2": "We have plenty of space in the landfill."}
+{"gold_label": "neutral", "sentence1": "That's a bottomless pit.", "sentence2": "Don't get bent out of shape over it."}
+{"gold_label": "contradiction", "sentence1": "I can't wrap my mind around that.", "sentence2": "Branding."}
+{"gold_label": "entailment", "sentence1": "It's the elephant in the room.", "sentence2": "Sorry, that's not really in my wheelhouse."}
+{"gold_label": "contradiction", "sentence1": "Let it go.", "sentence2": "She's batshit crazy"}
+{"gold_label": "contradiction", "sentence1": "The universe will provide.", "sentence2": "I know exactly."}
+{"gold_label": "contradiction", "sentence1": "What doesn't kill you makes you stronger.", "sentence2": "We have plenty of space in the landfill."}

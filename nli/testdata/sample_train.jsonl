@@ -1,0 +1,8 @@
+{"gold_label": "neutral", "sentence1": "I can't even.", "sentence2": "I just can't."}
+{"gold_label": "entailment", "sentence1": "There are no words.", "sentence2": "Speechless."}
+{"gold_label": "entailment", "sentence1": "Tears.", "sentence2": "I'm efforting that as we speak."}
+{"gold_label": "entailment", "sentence1": "We should workshop that idea.", "sentence2": "We should make sure we're on the same page."}
+{"gold_label": "neutral", "sentence1": "At the end of the day", "sentence2": "Not a problem."}
+{"gold_label": "entailment", "sentence1": "It's all good", "sentence2": "Everything happens for a reason."}
+{"gold_label": "contradiction", "sentence1": "That's so last century.", "sentence2": "That's so ironic."}
+{"gold_label": "contradiction", "sentence1": "I didn't sign up for that.", "sentence2": "For all intents and purposes"}
