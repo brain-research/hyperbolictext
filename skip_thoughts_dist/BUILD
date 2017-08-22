@@ -1,23 +1,12 @@
 package(
     default_visibility = [
-        ":distributed",
-        "//word_context:hypertext",
+        "//visibility:public",
     ]
 )
 
 licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
-
-package_group(
-    name = "distributed",
-    packages = [
-        "//skip_thoughts_dist/...",
-    ],
-    includes = [
-        "//skip_thoughts:internal",
-    ],
-)
 
 py_library(
     name = "configuration",

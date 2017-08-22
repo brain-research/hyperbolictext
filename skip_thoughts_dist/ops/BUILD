@@ -1,7 +1,6 @@
 package(
     default_visibility = [
-        "//skip_thoughts_dist:distributed",
-        "//word_context:hypertext",
+        "//visibility:public",
     ]
 )
 

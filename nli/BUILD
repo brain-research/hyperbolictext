@@ -1,20 +1,12 @@
 package(
     default_visibility = [
-        ":nli",
-        "//word_context:hypertext",
+        "//visibility:public",
     ]
 )
 
 licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
-
-package_group(
-    name = "nli",
-    packages = [
-        "//nli/...",
-    ],
-)
 
 py_library(
     name = "eval_nli",

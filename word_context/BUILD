@@ -1,20 +1,8 @@
-package(default_visibility = [":hypertext"])
+package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
-
-package_group(
-    name = "hypertext",
-    packages = [
-        "//word_context/...",
-    ],
-    includes = [
-        "//skip_thoughts:internal",
-        "//skip_thoughts_dist:distributed",
-        "//nli:nli",
-    ],
-)
 
 py_library(
     name = "word_context_encoder",
