@@ -4,11 +4,11 @@ This directory contains a TensorFlow implementation of the
 [Skip-Thought Vectors](https://papers.nips.cc/paper/5950-skip-thought-vectors.pdf)
 model.
 
-The code in this directory is backed by the
+The code in this directory is backed by this 
 [open sourced](https://github.com/tensorflow/models/tree/master/skip_thoughts)
 implementation.
 
-## Differences to the Open-Source Version
+## Differences to the Other Version
 
   * Supports distributed training (asynchronous or synchronous).
   * Uses the `tf.HParams` container for configurations.

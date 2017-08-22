@@ -5,9 +5,9 @@ embeddings of text sequences in an unsupervised manner. This is a preliminary
 implementation with more changes (and documentation) forthcoming.
 
 ## Contact
-***Code author:*** Bhuwan Dhingra
+***Code authors:*** Bhuwan Dhingra, Chris Shallue
 
-***Pull requests and issues:*** @bdhingra
+***Pull requests and issues:*** @bdhingra, @cshallue
 
 ## Getting Started
 
