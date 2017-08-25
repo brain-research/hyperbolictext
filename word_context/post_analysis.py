@@ -39,9 +39,6 @@ tf.flags.DEFINE_string("checkpoint_path", None,
                        "Path to checkpoint or the directory containing the "
                        "checkpoint to analyse.")
 
-tf.flags.DEFINE_string("model_config_overrides", "",
-                       "JSON string containing configuration overrides.")
-
 tf.flags.DEFINE_string("vocab_file", "",
                        "Text file mapping word to id.")
 
@@ -54,6 +51,10 @@ tf.flags.DEFINE_string("sentences_file", "",
 
 tf.flags.DEFINE_boolean("plot", True,
                         "Whether to plot embeddings or not.")
+
+tf.flags.DEFINE_string("mr_data_dir", "",
+                       "Path to the Movie Review dataset. This should contain "
+                       "the files rt-polarity.pos and rt-polarity.neg.")
 
 # List of types to store output probabilities for.
 TARGET_TYPES = ["the", "you", "alejo", "noon", "pablo", "gravel", "she",
@@ -238,6 +239,56 @@ def save_nearest_neighbours(output_embeddings, vocab, seeds, num_nearest, metric
   f.close()
 
 
+def build_hierarchy(thought_vectors, sentences, metric):
+  """Recursively find the nearest neighbour with greater norm.
+
+  Args:
+    thought_vectors: 2D numpy array containing the thought vectors.
+    sentences: Corresponding string sentences.
+    metric: To compute distances.
+  """
+  if metric == "hyperbolic":
+    distances = _hyperbolic_distance(thought_vectors, thought_vectors)
+  elif metric == "cosine":
+    distances = - _cosine_similarity(thought_vectors, thought_vectors)
+  else:
+    distances = _sq_euclidean_distance(thought_vectors, thought_vectors)
+
+  sorted_index = np.argsort(distances, axis=1)
+
+  hyp_norms = np.squeeze(
+      _hyperbolic_distance(thought_vectors,
+                           np.zeros((1, thought_vectors.shape[1]))))
+
+  def _find_closest(n):
+    """Return closest neighbour of n-th sentence with greater norm."""
+    current_norm = hyp_norms[n]
+    neighbour_norms = hyp_norms[sorted_index[n, 1:]]
+    ii = 0
+    while True:
+      if ii == neighbour_norms.shape[0]: break
+      if neighbour_norms[ii] > current_norm:
+        break
+      ii += 1
+    if ii == neighbour_norms.shape[0]:
+      return None
+    else:
+      return sorted_index[n, 1 + ii]
+
+  f = tf.gfile.Open(os.path.join(FLAGS.output_dir,
+                                 "sentence_hierarchies.txt"), "w")
+  subset = np.random.randint(thought_vectors.shape[0], size=100)
+  for i in range(100):
+    current = subset[i]
+    f.write(sentences[current] + " (%.4f)" % hyp_norms[current] + "\n")
+    for j in range(10):
+      current = _find_closest(current)
+      if not current: break
+      f.write(sentences[current] + " (%.4f)" % hyp_norms[current] + "\n")
+    f.write("\n")
+  f.close()
+
+
 def elementwise_nearest_neighbours(thought_vectors, sentences, metric):
   """Find nearest neighbour to each given sentence.
 
@@ -255,11 +306,17 @@ def elementwise_nearest_neighbours(thought_vectors, sentences, metric):
 
   sorted_index = np.argsort(distances, axis=1)
 
+  hyp_norms = np.squeeze(
+      _hyperbolic_distance(thought_vectors,
+                           np.zeros((1, thought_vectors.shape[1]))))
+
   f = tf.gfile.Open(os.path.join(FLAGS.output_dir,
                                  "sentence_nearest_neighbours.txt"), "w")
   for i in range(thought_vectors.shape[0]):
-    f.write(sentences[i] + "\n")
-    f.write(sentences[sorted_index[i,1]] + "\n")
+    f.write(sentences[i] + " (%.4f)" % hyp_norms[i] + "\n")
+    for k in range(10):
+      f.write(sentences[sorted_index[i,k+1]] +
+              " (%.4f)" % hyp_norms[sorted_index[i,k+1]] + "\n")
     f.write("\n")
   f.close()
 
@@ -332,7 +389,51 @@ def save_target_probabilities(logits, targets, vocab):
   f.close()
 
 
-def plot_embeddings(embeddings, labels, num_to_plot, name, metric):
+def plot_average_norm_by_length(embeddings, sentences, metric):
+  """Plots the average embeddings norm for each length of sentences.
+
+  Args:
+    embeddings: 2D numpy array.
+    sentences: List of string sentences corresponding to the embeddings.
+    metric: "hyperbolic" or "cosine" or None.
+  """
+  if metric == "hyperbolic":
+    norms = np.squeeze(_hyperbolic_distance(
+        embeddings, np.zeros((1, embeddings.shape[1]))))
+  elif metric == "cosine":
+    norms = np.linalg.norm(embeddings, axis=1)
+  else:
+    norms = np.linalg.norm(embeddings, axis=1)
+  lengths = [len(sentence.split()) for sentence in sentences]
+  length_sum_norms = {}
+  length_counts = {}
+  for i in range(len(sentences)):
+    if lengths[i] not in length_sum_norms:
+      length_sum_norms[lengths[i]] = 0
+      length_counts[lengths[i]] = 0
+    length_sum_norms[lengths[i]] += norms[i]
+    length_counts[lengths[i]] += 1
+
+  tf.logging.info("Average Norm = %.4f",
+                  float(sum(length_sum_norms.values())) /
+                  sum(length_counts.values()))
+
+  plot_x = []
+  plot_y = []
+  for length in length_sum_norms.keys():
+    plot_x.append(length)
+    plot_y.append(float(length_sum_norms[length]) / length_counts[length])
+
+  fig, ax = plt.subplots()
+  ax.plot(plot_x, plot_y)
+  ax.set_xlabel('Sentence Length')
+  ax.set_ylabel('Average Norm')
+  f = tf.gfile.Open(os.path.join(FLAGS.output_dir, "average_lengths.png"), "w")
+  plt.savefig(f, dpi=1000)
+  f.close()
+
+
+def plot_embeddings(embeddings, labels, num_to_plot, name, metric, colors=None):
   """Plots a subset of the provided embeddings after projecting to 2D.
 
   If the embedding dimension > 2, these are first converted to 2 dimensions
@@ -375,16 +476,25 @@ def plot_embeddings(embeddings, labels, num_to_plot, name, metric):
     # Randomly sample subset to plot
     subset = np.random.randint(embeddings.shape[0], size=num_to_plot)
     embeddings_to_plot = embeddings_2d[subset, :]
+    if colors:
+      colors_to_plot = [colors[ii] for ii in subset]
+    else:
+      colors_to_plot = None
   else:
     subset = np.arange(embeddings.shape[0])
     embeddings_to_plot = embeddings_2d
+    colors_to_plot = colors
 
   # Plot the subset
   fig, ax = plt.subplots()
-  ax.scatter(embeddings_to_plot[:,0], embeddings_to_plot[:,1])
+  if colors_to_plot:
+    ax.scatter(embeddings_to_plot[:,0], embeddings_to_plot[:,1],
+               c=colors_to_plot)
+  else:
+    ax.scatter(embeddings_to_plot[:,0], embeddings_to_plot[:,1])
   if labels is not None:
     for i, ix in enumerate(subset):
-      ax.annotate(labels[ix],
+      ax.annotate(labels[ix].decode(encoding="utf-8", errors="ignore"),
                   (embeddings_to_plot[i,0], embeddings_to_plot[i,1]),
                   fontsize=3)
 
@@ -455,6 +565,14 @@ def _create_encode_batch(sentences, vocab):
   return encode_ids, encode_mask
 
 
+def _load_mr_dataset():
+  pos_file = tf.gfile.Open(os.path.join(FLAGS.mr_data_dir, "rt-polarity.pos"))
+  sentences = pos_file.read().splitlines()
+  neg_file = tf.gfile.Open(os.path.join(FLAGS.mr_data_dir, "rt-polarity.neg"))
+  sentences += neg_file.read().splitlines()
+  return sentences
+
+
 def main(unused_argv):
   # Create training directory if it doesn't already exist.
   if not tf.gfile.IsDirectory(FLAGS.output_dir):
@@ -462,9 +580,11 @@ def main(unused_argv):
     tf.gfile.MakeDirs(FLAGS.output_dir)
 
   # Set up the model config.
-  model_config = configuration.model_config()
-  if FLAGS.model_config_overrides:
-    model_config.parse_json(FLAGS.model_config_overrides)
+  # Set up the model config.
+  with tf.gfile.Open(
+      os.path.join(FLAGS.checkpoint_path, "model_config.json")) as f:
+    model_config_overrides = json.load(f)
+  model_config = configuration.model_config(**model_config_overrides)
   tf.logging.info("model_config: %s",
                   json.dumps(model_config.values(), indent=2))
 
@@ -500,8 +620,8 @@ def main(unused_argv):
 
     # Fetch output embeddings from the model
     output_embeddings = sess.run(model.output_embeddings)
-    thought_projection_matrix = sess.run("decoder/thoughts_projection/weights:0")
-    context_projection_matrix = sess.run("decoder/context_projection/weights:0")
+    #thought_projection_matrix = sess.run("decoder/thoughts_projection/weights:0")
+    #context_projection_matrix = sess.run("decoder/context_projection/weights:0")
 
     # Encode test sentences
     encode_ids, encode_mask = _create_encode_batch(TEST_SENTENCES, vocab_dict)
@@ -561,6 +681,10 @@ def main(unused_argv):
   elementwise_nearest_neighbours(test_thought_vectors, TEST_SENTENCES,
                                  model_config.logit_metric)
 
+  tf.logging.info("Building sentence hierarchies")
+  build_hierarchy(batch_thought_vectors, batch_sentences,
+                  model_config.logit_metric)
+
   tf.logging.info("Computing target word probabilities")
   batch_targets_reshaped = np.reshape(batch_targets, (encode_ids.shape[0], -1))
   batch_target_mask_reshaped = np.reshape(batch_target_mask, (encode_ids.shape[0], -1))
@@ -592,6 +716,15 @@ def main(unused_argv):
   f.close()
 
   if FLAGS.plot:
+    tf.logging.info("Plotting length distribution")
+    if model_config.logit_metric == "cosine":
+      rescaled_vectors = batch_thought_vectors / np.linalg.norm(
+          batch_thought_vectors, axis=1, keepdims=True)
+    else:
+      rescaled_vectors = batch_thought_vectors
+    plot_average_norm_by_length(rescaled_vectors, batch_sentences,
+                                model_config.logit_metric)
+
     tf.logging.info("Plotting word embeddings")
     if model_config.logit_metric == "hyperbolic":
       reparameterized_emb = output_embeddings
@@ -626,6 +759,21 @@ def main(unused_argv):
     plot_embeddings(rescaled_vectors, TEST_SENTENCES, -1,
                     "test_thought_vectors",
                     model_config.logit_metric)
+
+    tf.logging.info("Plotting test thought vectors and word embeddings")
+    # Randomly sample subset to plot
+    subset = np.random.randint(output_embeddings.shape[0], size=500)
+    rescaled_vectors = np.vstack([test_thought_vectors,
+                                  output_embeddings[subset,:]])
+    labels = TEST_SENTENCES + [vocab[ix] for ix in subset]
+    colors = [0] * len(TEST_SENTENCES) + [1] * subset.shape[0]
+    if model_config.logit_metric == "cosine":
+      rescaled_vectors = rescaled_vectors / np.linalg.norm(
+          rescaled_vectors, axis=1, keepdims=True)
+    plot_embeddings(rescaled_vectors, labels, -1,
+                    "all_vectors",
+                    model_config.logit_metric,
+                    colors=colors)
 
     if model_config.decode_strategy == "conditional":
       tf.logging.info("Plotting context vectors")
